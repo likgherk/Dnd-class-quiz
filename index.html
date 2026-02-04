@@ -1,3 +1,69 @@
+
 <!doctype html>
-...
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>D&D Class Personality Quiz</title>
+</head>
+<body style="font-family: system-ui, Arial, sans-serif; padding:16px;">
+
+<h1>🎲 D&D Class Personality Quiz</h1>
+<p>Tap the answers that fit you best.</p>
+
+<div id="app"></div>
+
+<script>
+const classes = ["Bard","Druid","Fighter","Monk","Ranger","Rogue","Sorcerer","Warlock","Wizard"];
+const scores = Object.fromEntries(classes.map(c => [c,0]));
+
+const questions = [
+  { q: "How do you solve problems?",
+    a: [
+      ["Think carefully", "Wizard"],
+      ["Go with instincts", "Druid"],
+      ["Act fast", "Rogue"],
+      ["Face it head on", "Fighter"]
+    ]
+  },
+  { q: "Your role in a group?",
+    a: [
+      ["Motivator", "Bard"],
+      ["Scout", "Ranger"],
+      ["Focused anchor", "Monk"],
+      ["Planner", "Wizard"]
+    ]
+  }
+];
+
+let i = 0;
+const app = document.getElementById("app");
+
+function render() {
+  if (i >= questions.length) {
+    const top = Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
+    app.innerHTML = `<h2>Your class: ${top}</h2>`;
+    return;
+  }
+
+  const q = questions[i];
+  app.innerHTML = `<h3>${q.q}</h3>`;
+  q.a.forEach(([text, cls]) => {
+    const b = document.createElement("button");
+    b.textContent = text;
+    b.style.display = "block";
+    b.style.margin = "8px 0";
+    b.onclick = () => {
+      scores[cls] += 1;
+      i++;
+      render();
+    };
+    app.appendChild(b);
+  });
+}
+
+render();
+</script>
+
+</body>
 </html>
