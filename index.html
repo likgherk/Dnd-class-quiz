@@ -1,69 +1,324 @@
-
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>D&D Class Personality Quiz</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; padding: 0; background:#f6f7fb; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 18px; }
+    .card { background: white; border-radius: 14px; padding: 18px; box-shadow: 0 6px 20px rgba(0,0,0,.08); margin-top: 14px; }
+    h1 { font-size: 22px; margin: 0 0 10px; }
+    p { margin: 8px 0; color: #333; }
+    .qnum { font-weight: 700; margin-bottom: 10px; }
+    button.option {
+      width: 100%;
+      padding: 14px;
+      margin: 10px 0;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      background: #fff;
+      font-size: 16px;
+      text-align: left;
+      cursor: pointer;
+    }
+    button.option:hover { background: #f2f4ff; }
+    .row { display:flex; gap:10px; flex-wrap: wrap; }
+    .small { font-size: 13px; color:#555; }
+    .pill { display:inline-block; padding:6px 10px; border-radius:999px; background:#eef; margin-right:6px; margin-top:6px; }
+    .cta { background:#111827; color:white; border:none; padding:12px 14px; border-radius:12px; cursor:pointer; }
+    .cta:disabled { opacity: 0.6; cursor:not-allowed; }
+    .barwrap { background:#eee; border-radius: 999px; overflow: hidden; height: 10px; }
+    .bar { height:10px; width:0%; background:#111827; transition: width .2s; }
+    .center { text-align:center; }
+    .muted { color:#666; }
+    a { color:#2b59ff; }
+  </style>
 </head>
-<body style="font-family: system-ui, Arial, sans-serif; padding:16px;">
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>🎲 D&D Class Personality Quiz</h1>
+      <p class="muted">Phone-friendly. No account needed. Answer 10 questions and get your best-fit class.</p>
+      <div class="barwrap" aria-label="progress">
+        <div class="bar" id="bar"></div>
+      </div>
+      <p class="small" id="progressText"></p>
+    </div>
 
-<h1>🎲 D&D Class Personality Quiz</h1>
-<p>Tap the answers that fit you best.</p>
+    <div class="card" id="quizCard">
+      <div class="qnum" id="qnum"></div>
+      <p id="qtext"></p>
+      <div id="options"></div>
+      <div class="row" style="margin-top: 12px;">
+        <button class="cta" id="backBtn">Back</button>
+        <button class="cta" id="restartBtn">Restart</button>
+      </div>
+      <p class="small muted" style="margin-top:10px;">
+        Tip: You can share this page link with friends. Works on iPhone/Android.
+      </p>
+    </div>
 
-<div id="app"></div>
+    <div class="card" id="resultCard" style="display:none;">
+      <h2 id="resultTitle" style="margin-top:0;">Result</h2>
+      <p id="resultDesc"></p>
+      <div id="topPills"></div>
+      <h3>Score breakdown</h3>
+      <div id="breakdown"></div>
+      <div class="center" style="margin-top:14px;">
+        <button class="cta" id="shareBtn">Share</button>
+        <button class="cta" id="restartBtn2" style="margin-left:10px;">Take again</button>
+      </div>
+      <p class="small muted" id="shareHint" style="margin-top:10px;"></p>
+    </div>
+  </div>
 
 <script>
-const classes = ["Bard","Druid","Fighter","Monk","Ranger","Rogue","Sorcerer","Warlock","Wizard"];
-const scores = Object.fromEntries(classes.map(c => [c,0]));
+  // Classes included (removed Artificer, Barbarian, Paladin, Cleric)
+  const CLASSES = ["Bard","Druid","Fighter","Monk","Ranger","Rogue","Sorcerer","Warlock","Wizard"];
 
-const questions = [
-  { q: "How do you solve problems?",
-    a: [
-      ["Think carefully", "Wizard"],
-      ["Go with instincts", "Druid"],
-      ["Act fast", "Rogue"],
-      ["Face it head on", "Fighter"]
-    ]
-  },
-  { q: "Your role in a group?",
-    a: [
-      ["Motivator", "Bard"],
-      ["Scout", "Ranger"],
-      ["Focused anchor", "Monk"],
-      ["Planner", "Wizard"]
-    ]
+  const DESCRIPTIONS = {
+    Bard: "Expressive and social—you lead with creativity, charm, and encouragement.",
+    Druid: "Grounded and adaptable—you trust instincts and the natural flow of things.",
+    Fighter: "Steady and reliable—you face challenges head-on and hold the line.",
+    Monk: "Disciplined and focused—you value self-mastery and calm under pressure.",
+    Ranger: "Observant and prepared—you thrive in exploration, tracking, and awareness.",
+    Rogue: "Clever and adaptable—you win with timing, strategy, and quick thinking.",
+    Sorcerer: "Passionate and intuitive—your power comes from within and shows when it counts.",
+    Warlock: "Mysterious and determined—you commit to a path and embrace power with consequences.",
+    Wizard: "Curious and strategic—you love mastering systems and solving complex problems."
+  };
+
+  const QUESTIONS = [
+    {
+      text: "When faced with a problem, you usually…",
+      options: [
+        { text: "Think it through logically.", cls: "Wizard" },
+        { text: "Trust your instincts.", cls: "Druid" },
+        { text: "Act quickly and adapt.", cls: "Rogue" },
+        { text: "Face it directly.", cls: "Fighter" }
+      ]
+    },
+    {
+      text: "In a group, your role tends to be…",
+      options: [
+        { text: "The strategist.", cls: "Wizard" },
+        { text: "The scout.", cls: "Ranger" },
+        { text: "The motivator.", cls: "Bard" },
+        { text: "The disciplined anchor.", cls: "Monk" }
+      ]
+    },
+    {
+      text: "Magic feels most meaningful when it is…",
+      options: [
+        { text: "Studied and controlled.", cls: "Wizard" },
+        { text: "Innate and emotional.", cls: "Sorcerer" },
+        { text: "Borrowed at a cost.", cls: "Warlock" },
+        { text: "Part of the natural world.", cls: "Druid" }
+      ]
+    },
+    {
+      text: "Your biggest strength is…",
+      options: [
+        { text: "Creativity.", cls: "Bard" },
+        { text: "Focus and discipline.", cls: "Monk" },
+        { text: "Precision and timing.", cls: "Rogue" },
+        { text: "Preparation and awareness.", cls: "Ranger" }
+      ]
+    },
+    {
+      text: "In a dangerous situation, you’re most likely to…",
+      options: [
+        { text: "Hold the line.", cls: "Fighter" },
+        { text: "Flank and strike.", cls: "Rogue" },
+        { text: "Control the battlefield.", cls: "Wizard" },
+        { text: "React fluidly.", cls: "Monk" }
+      ]
+    },
+    {
+      text: "What environment do you thrive in?",
+      options: [
+        { text: "Libraries and study spaces.", cls: "Wizard" },
+        { text: "Wilderness and open land.", cls: "Ranger" },
+        { text: "Cities, taverns, crowds.", cls: "Bard" },
+        { text: "Quiet, focused places.", cls: "Monk" }
+      ]
+    },
+    {
+      text: "People often describe you as…",
+      options: [
+        { text: "Charming.", cls: "Bard" },
+        { text: "Mysterious.", cls: "Warlock" },
+        { text: "Observant.", cls: "Ranger" },
+        { text: "Calculated.", cls: "Wizard" }
+      ]
+    },
+    {
+      text: "Your approach to power is…",
+      options: [
+        { text: "Earned through training.", cls: "Monk" },
+        { text: "A natural gift.", cls: "Sorcerer" },
+        { text: "A negotiated pact.", cls: "Warlock" },
+        { text: "A practical tool.", cls: "Wizard" }
+      ]
+    },
+    {
+      text: "Victory feels best when you win by…",
+      options: [
+        { text: "Outthinking the enemy.", cls: "Wizard" },
+        { text: "Outmaneuvering them.", cls: "Rogue" },
+        { text: "Enduring longer than they can.", cls: "Fighter" },
+        { text: "Turning the tide creatively.", cls: "Bard" }
+      ]
+    },
+    {
+      text: "Your inner drive is mostly about…",
+      options: [
+        { text: "Self-mastery.", cls: "Monk" },
+        { text: "Freedom.", cls: "Ranger" },
+        { text: "Expression.", cls: "Bard" },
+        { text: "Discovery.", cls: "Wizard" }
+      ]
+    }
+  ];
+
+  // State
+  let idx = 0;
+  let answers = new Array(QUESTIONS.length).fill(null);
+  let scores = Object.fromEntries(CLASSES.map(c => [c, 0]));
+
+  const qnum = document.getElementById("qnum");
+  const qtext = document.getElementById("qtext");
+  const optionsEl = document.getElementById("options");
+  const backBtn = document.getElementById("backBtn");
+  const restartBtn = document.getElementById("restartBtn");
+  const resultCard = document.getElementById("resultCard");
+  const quizCard = document.getElementById("quizCard");
+  const bar = document.getElementById("bar");
+  const progressText = document.getElementById("progressText");
+
+  function updateProgress() {
+    const pct = Math.round((idx / QUESTIONS.length) * 100);
+    bar.style.width = pct + "%";
+    progressText.textContent = `Question ${Math.min(idx + 1, QUESTIONS.length)} of ${QUESTIONS.length}`;
   }
-];
 
-let i = 0;
-const app = document.getElementById("app");
+  function renderQuestion() {
+    updateProgress();
+    const q = QUESTIONS[idx];
+    qnum.textContent = `Question ${idx + 1}`;
+    qtext.textContent = q.text;
+    optionsEl.innerHTML = "";
 
-function render() {
-  if (i >= questions.length) {
-    const top = Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
-    app.innerHTML = `<h2>Your class: ${top}</h2>`;
-    return;
+    q.options.forEach((opt, optIndex) => {
+      const btn = document.createElement("button");
+      btn.className = "option";
+      const chosen = answers[idx] === optIndex ? " ✅" : "";
+      btn.textContent = opt.text + chosen;
+      btn.onclick = () => {
+        answers[idx] = optIndex;
+        if (idx < QUESTIONS.length - 1) {
+          idx++;
+          renderQuestion();
+        } else {
+          showResults();
+        }
+      };
+      optionsEl.appendChild(btn);
+    });
+
+    backBtn.disabled = idx === 0;
   }
 
-  const q = questions[i];
-  app.innerHTML = `<h3>${q.q}</h3>`;
-  q.a.forEach(([text, cls]) => {
-    const b = document.createElement("button");
-    b.textContent = text;
-    b.style.display = "block";
-    b.style.margin = "8px 0";
-    b.onclick = () => {
-      scores[cls] += 1;
-      i++;
-      render();
-    };
-    app.appendChild(b);
-  });
-}
+  function recomputeScores() {
+    scores = Object.fromEntries(CLASSES.map(c => [c, 0]));
+    answers.forEach((optIndex, qIndex) => {
+      if (optIndex === null) return;
+      const cls = QUESTIONS[qIndex].options[optIndex].cls;
+      scores[cls] += 2;
+    });
+  }
 
-render();
+  function showResults() {
+    recomputeScores();
+
+    const entries = Object.entries(scores).sort((a,b) => b[1] - a[1]);
+    const topScore = entries[0][1];
+    const top = entries.filter(([_, sc]) => sc === topScore).map(([c]) => c);
+
+    const title = document.getElementById("resultTitle");
+    const desc = document.getElementById("resultDesc");
+    const pills = document.getElementById("topPills");
+    const breakdown = document.getElementById("breakdown");
+
+    title.textContent = top.length === 1 ? `Your class is: ${top[0]} 🎉` : `You’re a blend: ${top.join(", ")}`;
+    desc.textContent = top.length === 1 ? DESCRIPTIONS[top[0]] : "Your answers strongly matched multiple classes—try again with different instincts to break the tie!";
+
+    pills.innerHTML = "";
+    top.forEach(c => {
+      const span = document.createElement("span");
+      span.className = "pill";
+      span.textContent = c;
+      pills.appendChild(span);
+    });
+
+    breakdown.innerHTML = "";
+    entries.forEach(([c, sc]) => {
+      const p = document.createElement("p");
+      p.innerHTML = `<strong>${c}</strong>: ${sc}`;
+      breakdown.appendChild(p);
+    });
+
+    quizCard.style.display = "none";
+    resultCard.style.display = "block";
+    bar.style.width = "100%";
+    progressText.textContent = `Done!`;
+  }
+
+  function restart() {
+    idx = 0;
+    answers = new Array(QUESTIONS.length).fill(null);
+    scores = Object.fromEntries(CLASSES.map(c => [c, 0]));
+    resultCard.style.display = "none";
+    quizCard.style.display = "block";
+    renderQuestion();
+  }
+
+  backBtn.onclick = () => {
+    if (idx > 0) {
+      idx--;
+      renderQuestion();
+    }
+  };
+  restartBtn.onclick = restart;
+  document.getElementById("restartBtn2").onclick = restart;
+
+  // Share button
+  const shareBtn = document.getElementById("shareBtn");
+  const shareHint = document.getElementById("shareHint");
+  shareBtn.onclick = async () => {
+    const text = "Take this D&D class quiz!";
+    const url = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: document.title, text, url });
+        shareHint.textContent = "";
+      } catch (e) {
+        shareHint.textContent = "Sharing canceled.";
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        shareHint.textContent = "Link copied! Paste it in a text/social app.";
+      } catch (e) {
+        shareHint.textContent = "Copy failed—just copy the address bar link.";
+      }
+    }
+  };
+
+  // Start
+  renderQuestion();
 </script>
-
 </body>
 </html>
